@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as DreamJobRouteImport } from './routes/dream-job'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulatorRoute = SimulatorRouteImport.update({
+  id: '/simulator',
+  path: '/simulator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DreamJobRoute = DreamJobRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/dream-job': typeof DreamJobRoute
+  '/simulator': typeof SimulatorRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/dream-job': typeof DreamJobRoute
+  '/simulator': typeof SimulatorRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/dream-job': typeof DreamJobRoute
+  '/simulator': typeof SimulatorRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/dream-job' | '/upload'
+  fullPaths: '/' | '/dashboard' | '/dream-job' | '/simulator' | '/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/dream-job' | '/upload'
-  id: '__root__' | '/' | '/dashboard' | '/dream-job' | '/upload'
+  to: '/' | '/dashboard' | '/dream-job' | '/simulator' | '/upload'
+  id: '__root__' | '/' | '/dashboard' | '/dream-job' | '/simulator' | '/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DreamJobRoute: typeof DreamJobRoute
+  SimulatorRoute: typeof SimulatorRoute
   UploadRoute: typeof UploadRoute
 }
 
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulator': {
+      id: '/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof SimulatorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dream-job': {
@@ -106,6 +123,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DreamJobRoute: DreamJobRoute,
+  SimulatorRoute: SimulatorRoute,
   UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
