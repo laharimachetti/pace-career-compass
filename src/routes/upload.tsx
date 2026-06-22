@@ -171,8 +171,8 @@ function UploadPage() {
                         {state === "active" && (
                           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
                             <div
-                              className="h-full animate-[progress_1.4s_ease-in-out_infinite] rounded-full"
-                              style={{ background: "var(--gradient-brand)", width: "60%" }}
+                              className="h-full w-2/3 animate-pulse rounded-full"
+                              style={{ background: "var(--gradient-brand)" }}
                             />
                           </div>
                         )}
