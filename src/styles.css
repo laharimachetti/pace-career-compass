@@ -61,6 +61,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
