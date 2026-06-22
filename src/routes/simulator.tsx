@@ -10,7 +10,7 @@ export const Route = createFileRoute("/simulator")({
       { name: "description", content: "Test scenarios — a new internship, a side project, a certification — and see how your match score moves." },
     ],
   }),
-  component: Simulator;
+  component: Simulator,
 });
 
 type Scenario = { id: string; label: string; deltaMatch: number; deltaMonths: number; note: string };
