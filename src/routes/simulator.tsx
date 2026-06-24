@@ -1,7 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { SiteNav, SiteFooter } from "@/components/site-nav";
-import { useMemo, useState } from "react";
-import { Sparkles, TrendingUp, Clock, Target } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Sparkles, TrendingUp, Clock, Target, Loader2, ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
+import { useCareerStore } from "@/store/career-store";
+import { simulateScenarios } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/simulator")({
   head: () => ({
@@ -13,33 +16,88 @@ export const Route = createFileRoute("/simulator")({
   component: Simulator,
 });
 
-type Scenario = { id: string; label: string; deltaMatch: number; deltaMonths: number; note: string };
-const SCENARIOS: Scenario[] = [
-  { id: "intern", label: "Land a backend internship this summer", deltaMatch: 12, deltaMonths: -2, note: "Adds production experience and a referral surface." },
-  { id: "ddia", label: "Finish Designing Data-Intensive Applications", deltaMatch: 6, deltaMonths: -1, note: "Closes most of the system design gap." },
-  { id: "oss", label: "Merge 3 PRs into a popular OSS repo", deltaMatch: 5, deltaMonths: 0, note: "Signals real-world code quality and collaboration." },
-  { id: "leetcode", label: "Solve 50 medium LeetCode in 8 weeks", deltaMatch: 8, deltaMonths: -1, note: "Direct correlation with phone screen pass rate." },
-  { id: "side", label: "Ship a distributed systems side project", deltaMatch: 10, deltaMonths: -1, note: "Best single move for your current profile." },
-  { id: "switch", label: "Switch target role to ML Engineer", deltaMatch: -18, deltaMonths: 4, note: "Heavier math + research path. Worth it if you love it." },
-];
-
 function Simulator() {
-  const [active, setActive] = useState<Set<string>>(new Set());
-  const base = { match: 64, months: 7 };
+  const resumeText = useCareerStore((s) => s.resumeText);
+  const targetRole = useCareerStore((s) => s.targetRole);
+  const role = useCareerStore((s) => s.roleAnalysis);
+  const scenarios = useCareerStore((s) => s.scenarios);
+  const setScenarios = useCareerStore((s) => s.setScenarios);
+  const runSimulate = useServerFn(simulateScenarios);
+
+  const baseScore = role?.readiness.score ?? 0;
+  const baseWeeks = role?.readiness.timeToReadyWeeks ?? 0;
+
+  const [active, setActive] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (scenarios || !resumeText || !targetRole || !role) return;
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeText, targetRole, role]);
+
+  async function load() {
+    if (!resumeText || !targetRole) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await runSimulate({
+        data: { resumeText, targetRole, currentScore: baseScore },
+      });
+      setScenarios(result.scenarios);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const projected = useMemo(() => {
-    let match = base.match;
-    let months = base.months;
-    for (const s of SCENARIOS) if (active.has(s.id)) { match += s.deltaMatch; months += s.deltaMonths; }
-    return { match: Math.max(0, Math.min(100, match)), months: Math.max(1, months) };
-  }, [active]);
+    if (!scenarios) return { match: baseScore, weeks: baseWeeks };
+    let match = baseScore;
+    let weeks = baseWeeks;
+    scenarios.forEach((s, i) => {
+      if (active.has(i)) {
+        match += s.readinessIncrease;
+        weeks -= s.timelineReductionWeeks;
+      }
+    });
+    return {
+      match: Math.max(0, Math.min(100, Math.round(match))),
+      weeks: Math.max(1, Math.round(weeks)),
+    };
+  }, [active, scenarios, baseScore, baseWeeks]);
 
-  const toggle = (id: string) =>
+  const toggle = (i: number) =>
     setActive((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
       return next;
     });
+
+  if (!resumeText || !targetRole || !role) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteNav />
+        <main className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
+          <h1 className="text-3xl font-semibold tracking-tight">Build your plan first</h1>
+          <p className="mt-3 text-muted-foreground">
+            The simulator runs against your resume and target role.
+          </p>
+          <Link
+            to="/upload"
+            className="mt-6 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-primary-foreground"
+            style={{ background: "var(--gradient-brand)" }}
+          >
+            Start <ArrowRight className="h-4 w-4" />
+          </Link>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,38 +106,69 @@ function Simulator() {
         <div className="text-xs uppercase tracking-wide text-muted-foreground">What-If Simulator</div>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight">Test your next move before you make it.</h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Toggle scenarios on the left. The projected outcome updates on the right — match score, timeline, and the one thing you should do first.
+          Personalized scenarios against {targetRole}. Toggle any combination to see your projected match score and timeline shift.
         </p>
 
+        {loading && (
+          <div className="mt-8 flex items-center gap-3 rounded-xl border border-border bg-card p-5">
+            <Loader2 className="h-4 w-4 animate-spin text-brand" />
+            <span className="text-sm">Generating personalized scenarios from your resume…</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-8 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+            <AlertCircle className="mt-0.5 h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <div className="text-sm font-medium">Couldn't generate scenarios</div>
+              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+              <button
+                onClick={load}
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {scenarios && (
         <div className="mt-10 grid gap-6 lg:grid-cols-5">
           <section className="lg:col-span-3 space-y-3">
-            {SCENARIOS.map((s) => {
-              const on = active.has(s.id);
+            {scenarios.map((s, i) => {
+              const on = active.has(i);
               return (
                 <button
-                  key={s.id}
-                  onClick={() => toggle(s.id)}
+                  key={i}
+                  onClick={() => toggle(i)}
                   className={`w-full text-left rounded-xl border bg-card p-5 shadow-[var(--shadow-card)] transition-all ${
                     on ? "border-brand ring-2 ring-brand/20" : "border-border hover:border-foreground/20"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-sm font-semibold">{s.label}</div>
+                      <div className="text-sm font-semibold">{s.scenario}</div>
                       <div className="mt-1 text-sm text-muted-foreground">{s.note}</div>
                     </div>
                     <div className="shrink-0 text-right text-xs">
-                      <div className={s.deltaMatch >= 0 ? "text-brand" : "text-destructive"}>
-                        {s.deltaMatch > 0 ? "+" : ""}{s.deltaMatch}% match
+                      <div className={s.readinessIncrease >= 0 ? "text-brand" : "text-destructive"}>
+                        {s.readinessIncrease > 0 ? "+" : ""}{s.readinessIncrease}% match
                       </div>
                       <div className="text-muted-foreground">
-                        {s.deltaMonths > 0 ? "+" : ""}{s.deltaMonths} mo
+                        {s.timelineReductionWeeks > 0 ? "−" : "+"}
+                        {Math.abs(s.timelineReductionWeeks)} wk
                       </div>
                     </div>
                   </div>
                 </button>
               );
             })}
+            <button
+              onClick={load}
+              className="mt-2 inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Regenerate scenarios
+            </button>
           </section>
 
           <aside className="lg:col-span-2">
@@ -97,13 +186,13 @@ function Simulator() {
                   <div className="h-full rounded-full transition-all duration-500" style={{ width: `${projected.match}%`, background: "var(--gradient-brand)" }} />
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {projected.match - base.match >= 0 ? "+" : ""}
-                  {projected.match - base.match}% from today
+                  {projected.match - baseScore >= 0 ? "+" : ""}
+                  {projected.match - baseScore}% from today
                 </div>
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <Metric icon={Clock} label="Time to ready" value={`${projected.months} mo`} />
+                <Metric icon={Clock} label="Time to ready" value={`${projected.weeks} wk`} />
                 <Metric icon={Target} label="Confidence" value={projected.match > 80 ? "High" : projected.match > 60 ? "Medium" : "Building"} />
               </div>
 
@@ -113,17 +202,33 @@ function Simulator() {
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {active.size === 0
-                    ? "Pick one scenario to see how your trajectory shifts."
-                    : "Stack the internship with the side project. Same calendar months, biggest jump in match."}
+                    ? "Toggle a scenario to see how your trajectory shifts."
+                    : pickTop(scenarios, active)}
                 </p>
               </div>
             </div>
           </aside>
         </div>
+        )}
       </main>
       <SiteFooter />
     </div>
   );
+}
+
+function pickTop(scenarios: { scenario: string; readinessIncrease: number }[], active: Set<number>) {
+  let best = -Infinity;
+  let bestLabel = "";
+  active.forEach((i) => {
+    const s = scenarios[i];
+    if (s && s.readinessIncrease > best) {
+      best = s.readinessIncrease;
+      bestLabel = s.scenario;
+    }
+  });
+  return bestLabel
+    ? `Highest-impact pick in this combination: ${bestLabel}.`
+    : "Add scenarios with positive impact to see a recommendation.";
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
