@@ -1,7 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { SiteNav, SiteFooter } from "@/components/site-nav";
-import { Search, ArrowRight, Briefcase } from "lucide-react";
+import { Search, ArrowRight, Briefcase, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useCareerStore } from "@/store/career-store";
+import { analyzeForRole } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/dream-job")({
   head: () => ({
@@ -27,13 +30,61 @@ const ROLES = [
 
 function DreamJobPage() {
   const navigate = useNavigate();
+  const resumeText = useCareerStore((s) => s.resumeText);
+  const setTargetRole = useCareerStore((s) => s.setTargetRole);
+  const setRoleAnalysis = useCareerStore((s) => s.setRoleAnalysis);
+  const storedTarget = useCareerStore((s) => s.targetRole);
+  const runAnalyzeForRole = useServerFn(analyzeForRole);
+
   const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(storedTarget);
+  const [custom, setCustom] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => ROLES.filter((r) => (r.title + r.company).toLowerCase().includes(q.toLowerCase())),
     [q],
   );
+
+  const submit = async () => {
+    const role = (selected || custom).trim();
+    if (!role || !resumeText) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setTargetRole(role);
+      const result = await runAnalyzeForRole({ data: { resumeText, targetRole: role } });
+      setRoleAnalysis(result);
+      navigate({ to: "/dashboard" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!resumeText) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteNav />
+        <main className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
+          <h1 className="text-3xl font-semibold tracking-tight">Upload a resume first</h1>
+          <p className="mt-3 text-muted-foreground">
+            We need to read your resume before we can benchmark you against a target role.
+          </p>
+          <Link
+            to="/upload"
+            className="mt-6 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-primary-foreground"
+            style={{ background: "var(--gradient-brand)" }}
+          >
+            Upload resume <ArrowRight className="h-4 w-4" />
+          </Link>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,17 +134,60 @@ function DreamJobPage() {
           })}
         </div>
 
+        <div className="mt-8 rounded-xl border border-border bg-card p-5">
+          <label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Or type a custom role
+          </label>
+          <input
+            value={custom}
+            onChange={(e) => {
+              setCustom(e.target.value);
+              setSelected(null);
+            }}
+            placeholder="e.g. Solutions Architect at a healthcare startup"
+            className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          />
+        </div>
+
+        {error && (
+          <div className="mt-6 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div className="flex-1">
+              <div className="text-sm font-medium">Couldn't generate your plan</div>
+              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+              <button
+                onClick={submit}
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Retry
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-10 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {selected ? <>Targeting <span className="font-medium text-foreground">{selected}</span></> : "Pick a role to continue"}
+            {selected || custom ? (
+              <>Targeting <span className="font-medium text-foreground">{selected || custom}</span></>
+            ) : (
+              "Pick a role or type your own to continue"
+            )}
           </p>
           <button
-            disabled={!selected}
-            onClick={() => navigate({ to: "/dashboard" })}
+            disabled={(!selected && !custom.trim()) || loading}
+            onClick={submit}
             className="inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 disabled:opacity-40"
             style={{ background: "var(--gradient-brand)" }}
           >
-            Build my Career GPS <ArrowRight className="h-4 w-4" />
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Building your plan…
+              </>
+            ) : (
+              <>
+                Build my Career GPS <ArrowRight className="h-4 w-4" />
+              </>
+            )}
           </button>
         </div>
       </main>
