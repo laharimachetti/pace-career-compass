@@ -62,15 +62,16 @@ export const useCareerStore = create<CareerState>()(
     }),
     {
       name: "pace-career-store",
-      storage: createJSONStorage(() =>
-        typeof window === "undefined"
-          ? ({
-              getItem: () => null,
-              setItem: () => {},
-              removeItem: () => {},
-            } as Storage)
-          : window.localStorage,
-      ),
+      storage: createJSONStorage(() => {
+        if (typeof window === "undefined") {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return window.localStorage;
+      }),
     },
   ),
 );
