@@ -1,0 +1,7 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Nitro's "netlify" preset emits the SSR handler into
+# .netlify/functions-internal/ and writes the matching _redirects file
+# into `dist/` automatically, so no extra redirect rules are needed.
