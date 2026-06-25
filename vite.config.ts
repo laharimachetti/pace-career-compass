@@ -12,4 +12,7 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force Nitro on with the Netlify preset for self-deploys outside Lovable.
+  // `NITRO_PRESET` env var still wins if set by the host.
+  nitro: { preset: "netlify" },
 });
