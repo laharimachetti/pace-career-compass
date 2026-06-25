@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { SiteNav, SiteFooter } from "@/components/site-nav";
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles, TrendingUp, Clock, Target, Loader2, ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
 import { useCareerStore } from "@/store/career-store";
-import { simulateScenarios } from "@/lib/ai.functions";
+import { simulateScenarios } from "@/services/gemini.service";
 
 export const Route = createFileRoute("/simulator")({
   head: () => ({
@@ -22,8 +21,6 @@ function Simulator() {
   const role = useCareerStore((s) => s.roleAnalysis);
   const scenarios = useCareerStore((s) => s.scenarios);
   const setScenarios = useCareerStore((s) => s.setScenarios);
-  const runSimulate = useServerFn(simulateScenarios);
-
   const baseScore = role?.readiness.score ?? 0;
   const baseWeeks = role?.readiness.timeToReadyWeeks ?? 0;
 
@@ -42,8 +39,10 @@ function Simulator() {
     setLoading(true);
     setError(null);
     try {
-      const result = await runSimulate({
-        data: { resumeText, targetRole, currentScore: baseScore },
+      const result = await simulateScenarios({
+        resumeText,
+        targetRole,
+        currentScore: baseScore,
       });
       setScenarios(result.scenarios);
     } catch (e) {

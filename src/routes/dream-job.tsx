@@ -1,10 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { SiteNav, SiteFooter } from "@/components/site-nav";
 import { Search, ArrowRight, Briefcase, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCareerStore } from "@/store/career-store";
-import { analyzeForRole } from "@/lib/ai.functions";
+import { analyzeForRole } from "@/services/gemini.service";
 
 export const Route = createFileRoute("/dream-job")({
   head: () => ({
@@ -34,8 +33,6 @@ function DreamJobPage() {
   const setTargetRole = useCareerStore((s) => s.setTargetRole);
   const setRoleAnalysis = useCareerStore((s) => s.setRoleAnalysis);
   const storedTarget = useCareerStore((s) => s.targetRole);
-  const runAnalyzeForRole = useServerFn(analyzeForRole);
-
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string | null>(storedTarget);
   const [custom, setCustom] = useState("");
@@ -54,7 +51,7 @@ function DreamJobPage() {
     setError(null);
     try {
       setTargetRole(role);
-      const result = await runAnalyzeForRole({ data: { resumeText, targetRole: role } });
+      const result = await analyzeForRole({ resumeText, targetRole: role });
       setRoleAnalysis(result);
       navigate({ to: "/dashboard" });
     } catch (e) {

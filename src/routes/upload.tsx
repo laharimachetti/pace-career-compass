@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { SiteNav, SiteFooter } from "@/components/site-nav";
 import {
   UploadCloud,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import { parseResumeFile } from "@/services/resume-parser.service";
-import { analyzeResume } from "@/lib/ai.functions";
+import { analyzeResume } from "@/services/gemini.service";
 import { useCareerStore } from "@/store/career-store";
 
 export const Route = createFileRoute("/upload")({
@@ -44,8 +43,6 @@ function UploadPage() {
   const setAnalysis = useCareerStore((s) => s.setAnalysis);
   const analysis = useCareerStore((s) => s.analysis);
   const storedFileName = useCareerStore((s) => s.fileName);
-
-  const runAnalyze = useServerFn(analyzeResume);
 
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -77,7 +74,7 @@ function UploadPage() {
         setTimeout(() => setStageIndex(i + 2), delay * (i + 1)),
       );
       try {
-        const result = await runAnalyze({ data: { resumeText: parsed.text } });
+        const result = await analyzeResume({ resumeText: parsed.text });
         setAnalysis(result);
         setStageIndex(STAGES.length);
       } finally {
